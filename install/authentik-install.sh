@@ -55,8 +55,8 @@ setup_yq
 setup_go
 RUST_PROFILE="minimal" RUST_TOOLCHAIN="stable" setup_rust
 UV_PYTHON_INSTALL_DIR="/usr/local/bin" PYTHON_VERSION="3.14.7" setup_uv
-PG_VERSION="17" setup_postgresql
-PG_DB_NAME="authentik" PG_DB_USER="authentik" PG_DB_GRANT_SUPERUSER="true" setup_postgresql_db
+# PG_VERSION="17" setup_postgresql
+# PG_DB_NAME="authentik" PG_DB_USER="authentik" PG_DB_GRANT_SUPERUSER="true" setup_postgresql_db
 
 XMLSEC_VERSION="1.3.12"
 AUTHENTIK_VERSION="version/2026.8.0"
@@ -143,7 +143,16 @@ msg_info "Creating authentik config"
 mkdir -p /etc/authentik
 mv /opt/authentik/authentik/lib/default.yml /etc/authentik/config.yml
 yq -i ".secret_key = \"$(openssl rand -base64 128 | tr -dc 'a-zA-Z0-9' | head -c64)\"" /etc/authentik/config.yml
-yq -i ".postgresql.password = \"${PG_DB_PASS}\"" /etc/authentik/config.yml
+# yq -i ".postgresql.password = \"${PG_DB_PASS}\"" /etc/authentik/config.yml
+read -rsp "Enter PostgreSQL password for authentik: " PSQL_AUTHENTIK_PW
+echo
+
+yq -i '.postgresql.host = "10.0.0.10"' /etc/authentik/config.yml
+yq -i '.postgresql.port = 5432' /etc/authentik/config.yml
+yq -i '.postgresql.name = "authentik_db"' /etc/authentik/config.yml
+yq -i '.postgresql.user = "authentikuser"' /etc/authentik/config.yml
+yq -i ".postgresql.password = \"${PSQL_AUTHENTIK_PW}\"" /etc/authentik/config.yml
+unset PSQL_AUTHENTIK_PW
 yq -i ".events.context_processors.geoip = \"/opt/authentik-data/geoip/GeoLite2-City.mmdb\"" /etc/authentik/config.yml
 yq -i ".events.context_processors.asn = \"/opt/authentik-data/geoip/GeoLite2-ASN.mmdb\"" /etc/authentik/config.yml
 yq -i ".blueprints_dir = \"/opt/authentik/blueprints\"" /etc/authentik/config.yml
@@ -207,7 +216,7 @@ cat <<EOF >/etc/systemd/system/authentik-server.service
 [Unit]
 Description=authentik Server
 After=network.target
-Wants=postgresql.service
+# Wants=postgresql.service
 
 [Service]
 User=authentik
@@ -226,7 +235,7 @@ EOF
 cat <<EOF >/etc/systemd/system/authentik-worker.service
 [Unit]
 Description=authentik Worker
-After=network.target postgresql.service
+After=network.target
 
 [Service]
 User=authentik
@@ -247,7 +256,7 @@ cat <<EOF >/etc/systemd/system/authentik-ldap.service
 [Unit]
 Description=authentik LDAP Outpost
 After=network.target
-Wants=postgresql.service
+# Wants=postgresql.service
 
 [Service]
 User=authentik
@@ -266,7 +275,7 @@ cat <<EOF >/etc/systemd/system/authentik-rac.service
 [Unit]
 Description=authentik RAC Outpost
 After=network.target
-Wants=postgresql.service
+# Wants=postgresql.service
 
 [Service]
 User=authentik
@@ -285,7 +294,7 @@ cat <<EOF >/etc/systemd/system/authentik-radius.service
 [Unit]
 Description=authentik Radius Outpost
 After=network.target
-Wants=postgresql.service
+# Wants=postgresql.service
 
 [Service]
 User=authentik
