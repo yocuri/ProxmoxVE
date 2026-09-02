@@ -1,3 +1,11 @@
+DB_HOST="10.0.0.10"
+DB_PORT="5432"
+DB_NAME="outline_db"
+DB_USER="outlineuser"
+
+REDIS_HOST="10.0.0.100"
+REDIS_PORT="6379"
+
 #!/usr/bin/env bash
 
 # Copyright (c) 2021-2026 community-scripts ORG
@@ -13,20 +21,31 @@ setting_up_container
 network_check
 update_os
 
-msg_info "Installing Dependencies"
-$STD apt install -y \
-  mkcert \
-  git \
-  redis
-msg_ok "Installed Dependencies"
+# msg_info "Installing Dependencies"
+# $STD apt install -y \
+#  mkcert \
+#  git \
+#  redis
+# msg_ok "Installed Dependencies"
 
 NODE_VERSION="26" NODE_MODULE="corepack" setup_nodejs
-PG_VERSION="16" setup_postgresql
-PG_DB_NAME="outline" PG_DB_USER="outline" setup_postgresql_db
+# PG_VERSION="16" setup_postgresql
+# PG_DB_NAME="outline" PG_DB_USER="outline" setup_postgresql_db
 
 fetch_and_deploy_gh_release "outline" "outline/outline" "tarball"
 
 msg_info "Configuring Outline (Patience)"
+
+read -rsp "PostgreSQL password: " DB_PASS
+echo
+read -rsp "Redis password: " REDIS_PASS
+echo
+read -rp "Outline public URL: " OUTLINE_URL
+read -rp "Authentik OIDC issuer URL: " OIDC_ISSUER_URL
+read -rp "Authentik OIDC client ID: " OIDC_CLIENT_ID
+read -rsp "Authentik OIDC client secret: " OIDC_CLIENT_SECRET
+echo
+
 SECRET_KEY="$(openssl rand -hex 32)"
 UTILS_SECRET="$(openssl rand -hex 32)"
 cd /opt/outline
@@ -35,10 +54,17 @@ export NODE_ENV=development
 sed -i "s#^NODE_ENV=.*#NODE_ENV=development#" /opt/outline/.env
 sed -i "s#^SECRET_KEY=.*#SECRET_KEY=${SECRET_KEY}#" /opt/outline/.env
 sed -i "s#^UTILS_SECRET=.*#UTILS_SECRET=${UTILS_SECRET}#" /opt/outline/.env
-sed -i "s#^DATABASE_URL=.*#DATABASE_URL=postgres://${PG_DB_USER}:${PG_DB_PASS}@localhost:5432/${PG_DB_NAME}#" /opt/outline/.env
-sed -i "s#^REDIS_URL=.*#REDIS_URL=redis://localhost:6379#" /opt/outline/.env
-sed -i "s#^URL=.*#URL=http://${LOCAL_IP}#" /opt/outline/.env
-sed -i "s#^FORCE_HTTPS=.*#FORCE_HTTPS=false#" /opt/outline/.env
+# sed -i "s#^DATABASE_URL=.*#DATABASE_URL=postgres://${PG_DB_USER}:${PG_DB_PASS}@localhost:5432/${PG_DB_NAME}#" /opt/outline/.env
+sed -i "s#^DATABASE_URL=.*#DATABASE_URL=postgres://${DB_USER}:${DB_PASS}@${DB_HOST}:${DB_PORT}/${DB_NAME}#" /opt/outline/.env
+# sed -i "s#^REDIS_URL=.*#REDIS_URL=redis://localhost:6379#" /opt/outline/.env
+sed -i "s#^REDIS_URL=.*#REDIS_URL=redis://:${REDIS_PASS}@${REDIS_HOST}:${REDIS_PORT}#" /opt/outline/.env
+#sed -i "s#^URL=.*#URL=http://${LOCAL_IP}#" /opt/outline/.env
+#sed -i "s#^FORCE_HTTPS=.*#FORCE_HTTPS=false#" /opt/outline/.env
+sed -i "s#^URL=.*#URL=${OUTLINE_URL}#" /opt/outline/.env
+
+sed -i "s#^OIDC_ISSUER_URL=.*#OIDC_ISSUER_URL=${OIDC_ISSUER_URL}#" /opt/outline/.env
+sed -i "s#^OIDC_CLIENT_ID=.*#OIDC_CLIENT_ID=${OIDC_CLIENT_ID}#" /opt/outline/.env
+sed -i "s#^OIDC_CLIENT_SECRET=.*#OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}#" /opt/outline/.env
 export NODE_OPTIONS="--max-old-space-size=3584"
 export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 
