@@ -33,9 +33,7 @@ read -rsp "PostgreSQL password: " DB_PASSWORD
 echo
 read -rsp "Redis password: " REDIS_PASSWORD
 echo
-read -rsp "Directus admin email: " DIRECTUS_ADMIN_EMAIL
-echo
-read -rsp "Directus admin password: " DIRECTUS_ADMIN_PASSWORD
+read -rp "Directus admin email: " DIRECTUS_ADMIN_EMAIL
 echo
 msg_info "Installing Directus fork d9"
 mkdir -p /opt/d9/uploads /opt/d9/extensions
