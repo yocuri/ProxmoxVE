@@ -21,13 +21,17 @@ $STD apt install -y \
   openssl \
   libssl-dev \
   libjemalloc2 \
-  redis-server \
-  nginx \
   cmake
 msg_ok "Installed Dependencies"
 
-PG_VERSION="16" PG_MODULES="pgvector" setup_postgresql
-PG_DB_NAME="affine" PG_DB_USER="affine" setup_postgresql_db
+#PG_VERSION="16" PG_MODULES="pgvector" setup_postgresql
+#PG_DB_NAME="affine" PG_DB_USER="affine" setup_postgresql_db
+PG_DB_NAME="affine_db" PG_DB_USER="affineuser" PG_DB_HOST="10.0.0.10"
+REDIS_HOST="10.0.0.100" 
+read -rsp "PostgreSQL password: " PG_DB_PASS
+echo
+read -rsp "Redis password: " REDIS_PASSWORD
+echo
 NODE_VERSION="22" setup_nodejs
 setup_rust
 
@@ -45,8 +49,9 @@ NODE_ENV=production
 AFFINE_SERVER_PORT=3010
 AFFINE_SERVER_HOST=${LOCAL_IP}
 AFFINE_SERVER_EXTERNAL_URL=http://${LOCAL_IP}
-DATABASE_URL=postgresql://${PG_DB_USER}:${PG_DB_PASS}@localhost:5432/${PG_DB_NAME}
-REDIS_SERVER_HOST=localhost
+DATABASE_URL=postgresql://${PG_DB_USER}:${PG_DB_PASS}@${PG_DB_HOST}:5432/${PG_DB_NAME}
+REDIS_SERVER_HOST=${REDIS_HOST}
+REDIS_SERVER_PASSWORD=${REDIS_PASSWORD}
 REDIS_SERVER_PORT=6379
 AFFINE_INDEXER_ENABLED=false
 SECRET_KEY=${SECRET_KEY}
@@ -119,8 +124,8 @@ msg_info "Creating Services"
 cat <<EOF >/etc/systemd/system/affine-web.service
 [Unit]
 Description=AFFiNE Web Server
-After=network.target postgresql.service redis-server.service
-Requires=postgresql.service redis-server.service
+After=network.target
+# Requires=postgresql.service redis-server.service
 
 [Service]
 Type=simple
@@ -139,8 +144,8 @@ EOF
 cat <<EOF >/etc/systemd/system/affine-worker.service
 [Unit]
 Description=AFFiNE Background Worker
-After=network.target postgresql.service redis-server.service
-Requires=postgresql.service redis-server.service
+After=network.target
+# Requires=postgresql.service redis-server.service
 
 [Service]
 Type=simple
@@ -156,7 +161,7 @@ RestartSec=10
 WantedBy=multi-user.target
 EOF
 
-systemctl enable -q --now redis-server affine-web affine-worker
+systemctl enable -q --now affine-web affine-worker
 msg_ok "Created Services"
 
 msg_info "Creating Admin User"
@@ -182,35 +187,6 @@ if echo "$ADMIN_RESPONSE" | grep -q '"id"'; then
 else
   msg_warn "Admin creation skipped (may already exist)"
 fi
-
-msg_info "Configuring Nginx"
-cat <<EOF >/etc/nginx/sites-available/affine.conf
-upstream affine_backend {
-    server 127.0.0.1:3010;
-}
-
-server {
-    listen 80;
-    server_name _;
-
-    client_max_body_size 100M;
-
-    location / {
-        proxy_pass http://affine_backend;
-        proxy_http_version 1.1;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_redirect off;
-        proxy_buffering off;
-    }
-}
-EOF
-nginx_enable_site affine.conf
-msg_ok "Configured Nginx"
 
 motd_ssh
 customize
